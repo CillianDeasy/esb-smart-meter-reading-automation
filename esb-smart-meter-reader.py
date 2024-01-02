@@ -18,40 +18,45 @@ from datetime import datetime
 import logging
 
 
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+logger = logging.getLogger()
+logger.addHandler(console_handler)
+logger.setLevel(logging.INFO)
+
+
 class EsbDataCollection:
   
   def __init__(self, username, password, mprn) -> None:
     self.username = username
     self.password = password
     self.mprn = mprn
-    self.log = logging.getLogger('EsbDataCollection')
-    
-    _h = logging.StreamHandler(sys.stdout)
-    _h.setLevel(logging.INFO)
-    _h.setFormatter(logging.Formatter(fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    
-    self.log.addHandler(_h)
+
     
     self.csv = None
     self.json = None
     
 
   def __load_esb_data(self, start_date):
-    self.log.info('Opening session...')
+    logger.info('Opening session...')
     s = requests.Session()
     s.headers.update({
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36',
     }) 
     
-    self.log.info('Getting login page')
+    logger.info('Getting login page')
     try:
       login_page = s.get('https://myaccount.esbnetworks.ie/', allow_redirects=True)
       result = re.findall(r"(?<=var SETTINGS = )\S*;", str(login_page.content))
       settings = json.loads(result[0][:-1])
     except Exception as e:
-      self.log.error(e)
+      logger.error(e)
     
-    self.log.info('Sending credentials')
+    logger.info('Sending credentials')
     try:
       s.post(
         'https://login.esbnetworks.ie/esbntwkscustportalprdb2c01.onmicrosoft.com/B2C_1A_signup_signin/SelfAsserted?tx=' + settings['transId'] + '&p=B2C_1A_signup_signin', 
@@ -65,8 +70,8 @@ class EsbDataCollection:
         },
         allow_redirects=False)
     except Exception as e:
-      self.log.error(e)
-    self.log.info('Passing authentication')
+      logger.error(e)
+    logger.info('Passing authentication')
     try:
       confirm_login = s.get(
         'https://login.esbnetworks.ie/esbntwkscustportalprdb2c01.onmicrosoft.com/B2C_1A_signup_signin/api/CombinedSigninAndSignup/confirmed',
@@ -78,10 +83,10 @@ class EsbDataCollection:
         }
       )
     except Exception as e:
-      self.log.error(e)
+      logger.error(e)
     
-    self.log.debug('login confirmed: %s' % confirm_login)
-    self.log.info('parsing content')
+    logger.debug('login confirmed: %s' % confirm_login)
+    logger.info('parsing content')
     soup = BeautifulSoup(confirm_login.content, 'html.parser')
     form = soup.find('form', {'id': 'auto'})
     s.post(
@@ -94,11 +99,11 @@ class EsbDataCollection:
       }, 
     )
     
-    self.log.info('Getting data using v2 URL')
+    logger.info('Getting data using v2 URL')
     try:
       data = s.get('https://myaccount.esbnetworks.ie/DataHub/DownloadHdf?mprn=' + self.mprn + '&startDate=' + start_date.strftime('%Y-%m-%d'))
     except Exception as e:
-      self.log.error('Failed to retrieve data using v2 endpoint: %s' % e)
+      logger.error('Failed to retrieve data using v2 endpoint: %s' % e)
       
     data_decoded = data.content.decode('utf-8').splitlines()
     
