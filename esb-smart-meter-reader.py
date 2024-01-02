@@ -14,8 +14,9 @@ import re
 import json
 import csv
 import configparser
-from datetime import datetime
+import datetime, pytz
 import logging
+
 
 
 
@@ -106,7 +107,7 @@ class EsbDataCollection:
       logger.error('Failed to retrieve data using v2 endpoint: %s' % e)
       
     data_decoded = data.content.decode('utf-8').splitlines()
-    
+    logger.info('%s records retrieved and decoded.' % len(data_decoded))
     return data_decoded
 
 
@@ -130,6 +131,20 @@ class EsbDataCollection:
     return self.json
     
 
+def convert_to_unix(local_time):
+  utc = pytz.utc
+  epoch = datetime.datetime(1970,1,1,0,0,0,tzinfo=pytz.UTC)
+  local = pytz.timezone("Europe/Dublin")
+  local_fmt = '%d-%m-%Y %H:%M'
+  
+  dt = datetime.datetime.strptime(local_time, local_fmt)
+  adjusted = local.localize(dt)
+  
+  utc_ts = adjusted.astimezone(utc)
+    
+  return (utc_ts - epoch).total_seconds()
+  
+
 def main():
   config = configparser.ConfigParser()
   config.read('.secrets')
@@ -137,6 +152,9 @@ def main():
   esb = EsbDataCollection(config['esb']['USER'], config['esb']['PASSWORD'], config['esb']['MPRN'] )
   
   records = esb.get_csv_data()
+  
+  
+  
   
   
   sys.exit()
