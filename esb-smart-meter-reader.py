@@ -16,7 +16,8 @@ import csv
 import configparser
 import datetime, pytz
 import logging
-
+from influxdb import InfluxDBClient
+from copy import deepcopy
 
 
 
@@ -112,7 +113,7 @@ class EsbDataCollection:
 
 
   def get_csv_data(self):
-    today = datetime.today()
+    today = datetime.datetime.today()
     
     if self.csv is None:
       self.csv = self.__load_esb_data(today)
@@ -142,7 +143,7 @@ def convert_to_unix(local_time):
   
   utc_ts = adjusted.astimezone(utc)
     
-  return (utc_ts - epoch).total_seconds()
+  return int((utc_ts - epoch).total_seconds())
   
 
 def main():
@@ -151,12 +152,37 @@ def main():
   
   esb = EsbDataCollection(config['esb']['USER'], config['esb']['PASSWORD'], config['esb']['MPRN'] )
   
-  records = esb.get_csv_data()
+  records = esb.get_json_data()
   
+  logger.info('Opening InfluxDB connection...')
+  try:
+    client = InfluxDBClient(host=config['influx']['HOST'], port=8086, username=config['influx']['USER'], 
+                            password=config['influx']['PASSWORD'], ssl=False, verify_ssl=False)
+    
+    client.switch_database(config['influx']['DB'])
+  except Exception as e:
+    logger.exception(e)
+    
+  logger.info('Successfully connected to %s and using database: %s' % (config['influx']['HOST'], config['influx']['DB']))
   
+  points = []
+  entry = {}
+  for record in records:
+    entry['measurement'] = 'meter_reading'
+    entry['tags'] = {}
+    entry['tags']['MPRN'] = record['MPRN']
+    entry['tags']['MeterSerialNumber'] = record['Meter Serial Number']
+    entry['tags']['ReadType'] = record['Read Type']
+    entry['fields'] = {}
+    entry['fields']['value'] = float(record['Read Value'])
+    entry['time'] = convert_to_unix(record['Read Date and End Time'])
+    points.append(deepcopy(entry))
+    entry.clear()
+    
+  logger.info("%d records prepared for DB insertion" % len(points))
+  client.write_points(points)
   
-  
-  
+
   sys.exit()
   
   
