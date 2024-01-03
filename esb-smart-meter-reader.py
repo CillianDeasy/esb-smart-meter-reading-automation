@@ -26,24 +26,22 @@ logger.setLevel(logging.INFO)
 
 
 class EsbDataCollection:
-  
+
   def __init__(self, username, password, mprn) -> None:
     self.username = username
     self.password = password
     self.mprn = mprn
-
-    
     self.csv = None
     self.json = None
-    
+
 
   def __load_esb_data(self, start_date):
     logger.info('Opening session...')
     s = requests.Session()
     s.headers.update({
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36',
-    }) 
-    
+    })
+
     logger.info('Getting login page')
     try:
       login_page = s.get('https://myaccount.esbnetworks.ie/', allow_redirects=True)
@@ -51,14 +49,14 @@ class EsbDataCollection:
       settings = json.loads(result[0][:-1])
     except Exception as e:
       logger.exception(e)
-    
+
     logger.info('Sending credentials')
     try:
       s.post(
-        'https://login.esbnetworks.ie/esbntwkscustportalprdb2c01.onmicrosoft.com/B2C_1A_signup_signin/SelfAsserted?tx=' + settings['transId'] + '&p=B2C_1A_signup_signin', 
+        'https://login.esbnetworks.ie/esbntwkscustportalprdb2c01.onmicrosoft.com/B2C_1A_signup_signin/SelfAsserted?tx=' + settings['transId'] + '&p=B2C_1A_signup_signin',
         data={
-          'signInName': self.username, 
-          'password': self.password, 
+          'signInName': self.username,
+          'password': self.password,
           'request_type': 'RESPONSE'
         },
         headers={
@@ -80,7 +78,7 @@ class EsbDataCollection:
       )
     except Exception as e:
       logger.exception(e)
-    
+
     logger.debug('login confirmed: %s' % confirm_login)
     logger.info('parsing content')
     soup = BeautifulSoup(confirm_login.content, 'html.parser')
@@ -92,77 +90,74 @@ class EsbDataCollection:
         'state': form.find('input', {'name': 'state'})['value'],
         'client_info': form.find('input', {'name': 'client_info'})['value'],
         'code': form.find('input', {'name': 'code'})['value'],
-      }, 
+      },
     )
-    
+
     logger.info('Getting data using v2 URL')
     try:
       data = s.get('https://myaccount.esbnetworks.ie/DataHub/DownloadHdf?mprn=' + self.mprn + '&startDate=' + start_date.strftime('%Y-%m-%d'))
     except Exception as e:
       logger.error('Failed to retrieve data using v2 endpoint: %s' % e)
-      
+
     data_decoded = data.content.decode('utf-8').splitlines()
     logger.info('%s records retrieved and decoded.' % len(data_decoded))
     logger.info('Newest data in record is: %s' % data_decoded[1].split(',')[4])
     logger.info('Oldest data in record is: %s' % data_decoded[-1].split(',')[4])
-    
+
     return data_decoded
 
 
   def get_csv_data(self):
-    
+
     today = datetime.datetime.today()
-    
     if self.csv is None:
       self.csv = self.__load_esb_data(today)
-        
     return self.csv
-  
+
+
   def get_json_data(self):
-    
+
     if self.json is None:
       self.json = []
-    
       csv_reader = csv.DictReader( self.get_csv_data() )
       for row in csv_reader:
         self.json.append(row)
-      
     return self.json
-    
+
 
 def convert_to_unix(local_time):
   utc = pytz.utc
   epoch = datetime.datetime(1970,1,1,0,0,0,tzinfo=pytz.UTC)
   local = pytz.timezone("Europe/Dublin")
   local_fmt = '%d-%m-%Y %H:%M'
-  
+
   dt = datetime.datetime.strptime(local_time, local_fmt)
   adjusted = local.localize(dt)
-  
+
   utc_ts = adjusted.astimezone(utc)
-    
+
   return int((utc_ts - epoch).total_seconds())
-  
+
 
 def main():
   config = configparser.ConfigParser()
   config.read('.secrets')
-  
+
   esb = EsbDataCollection(config['esb']['USER'], config['esb']['PASSWORD'], config['esb']['MPRN'] )
-  
+
   records = esb.get_json_data()
-  
+
   logger.info('Opening InfluxDB connection...')
   try:
-    client = InfluxDBClient(host=config['influx']['HOST'], port=8086, username=config['influx']['USER'], 
+    client = InfluxDBClient(host=config['influx']['HOST'], port=8086, username=config['influx']['USER'],
                             password=config['influx']['PASSWORD'], ssl=False, verify_ssl=False)
-    
+
     client.switch_database(config['influx']['DB'])
   except Exception as e:
     logger.exception(e)
-    
+
   logger.info('Successfully connected to %s and using database: %s' % (config['influx']['HOST'], config['influx']['DB']))
-  
+
   points = []
   entry = {}
   for record in records:
@@ -176,15 +171,11 @@ def main():
     entry['time'] = convert_to_unix(record['Read Date and End Time'])
     points.append(deepcopy(entry))
     entry.clear()
-    
+
   logger.info("%d records prepared for DB insertion" % len(points))
   client.write_points(points)
-  
 
   sys.exit()
-  
-  
-
 
 
 if __name__ == "__main__":

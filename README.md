@@ -52,8 +52,6 @@ This is in my `sensors.yaml`
     queries:
       - name: ESB Power
         unit_of_measurement: kWh
-        device_class: energy
-        state_class: total
         value_template: "{{ value | multiply(0.5) }}"
         group_function: last
         measurement: '"meter_reading"'
