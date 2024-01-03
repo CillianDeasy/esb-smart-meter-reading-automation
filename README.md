@@ -69,7 +69,8 @@ customize:
     state_class: total
 
 ```
-
+# Change Notes
+* Tested 03/01/2024 - working
 
 # References
 * [https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script](https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script)

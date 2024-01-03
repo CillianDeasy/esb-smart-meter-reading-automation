@@ -1,12 +1,6 @@
 
 # #!/usr/bin/env python3
 
-# https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script
-# https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded
-
-# Modified by badger707
-# it works as of 21-JUL-2023
-
 import sys
 import requests
 from bs4 import BeautifulSoup
