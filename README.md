@@ -13,6 +13,7 @@ NOTES:
 * The call to the ESB portal allows the period to be specified, and the script provides today as the date requested. Unfortunately, this parameter is ignored, so we get *all* the records available e.g. 20k+ and counting.
 * The data is provided every 30 mins in kW units. Home assistant requries this in *kWh* so in the sensor definition I multiple the value by 0.5 to adjust.
 * The timestamp in the source data is in Irish Standard Time, so I convert to UNIX EPOCH before inserting into the database.
+* Apparently while the datapoints are every 30mins, the data is only updated on a *mostly* once daily basis.
 
 # Script usage
 
