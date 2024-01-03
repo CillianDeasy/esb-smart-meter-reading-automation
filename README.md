@@ -52,6 +52,7 @@ This is in my `sensors.yaml`
     database: <database>
     verify_ssl: false
     ssl: false
+    scan_interval: 1800
     queries:
       - name: ESB Power
         unit_of_measurement: kWh
