@@ -56,7 +56,7 @@ class EsbDataCollection:
       result = re.findall(r"(?<=var SETTINGS = )\S*;", str(login_page.content))
       settings = json.loads(result[0][:-1])
     except Exception as e:
-      logger.error(e)
+      logger.exception(e)
     
     logger.info('Sending credentials')
     try:
@@ -72,7 +72,7 @@ class EsbDataCollection:
         },
         allow_redirects=False)
     except Exception as e:
-      logger.error(e)
+      logger.exception(e)
     logger.info('Passing authentication')
     try:
       confirm_login = s.get(
@@ -85,7 +85,7 @@ class EsbDataCollection:
         }
       )
     except Exception as e:
-      logger.error(e)
+      logger.exception(e)
     
     logger.debug('login confirmed: %s' % confirm_login)
     logger.info('parsing content')
