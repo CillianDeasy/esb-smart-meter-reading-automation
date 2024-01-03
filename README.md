@@ -18,7 +18,7 @@ NOTES:
 
 The script will run on demand, or via cron. The required parameters should be in a `.secrets` file, in the same directory as the script. This is written in python3, and the `requirements.txt` file shows the dependancies.
 
-It works off of *all the data retrieved, so will become less efficient as time goes on. If there is a matching timestamp already in the database, it will be updated with the new value, otherwise any missing data will be inserted.
+It works off of *all* the data retrieved, so will become less efficient as time goes on. If there is a matching timestamp already in the database, it will be updated with the new value, otherwise any missing data will be inserted.
 
 The following are the required parameters for the config file.
 ## Config file format
