@@ -1,137 +1,78 @@
-#  esb-smart-meter-reading-automation
-
+# ESB Networks Smart Meter Data to InfluxDB
 ![](https://github.com/badger707/esb-smart-meter-reading-automation/blob/main/esb-smart-meter.png)
-<br><br>
-# How to read your Smart Meter data automatically?
-<br>
-Since I've got smart meter installed, I was looking for a way to automatically collect my meter data to track electricity usage (and solar export) with corresponding pricing as per current supplier rates.<br><br>
-While searching on internet I found this post https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script as potential candidate to start with.
-<br>
-Unfortunatelly linked script is broken - ESB have chnaged some URL's and file structure since then and I had to spend some time and tinker with code to make it working with new (as of writing it is 21-JUL-2023) URL structure.<br><br>
-End result - code is fixed and runs just fine now, I am able to read all smart meter readings from my account in JSON format and push it further to my InfluxDB and Home Assistant for analysis/reporting.
-<br><br>
-# Requirements<br>
-* You need to create account with ESB here https://myaccount.esbnetworks.ie <br>
+
+I've wanted to get the ESB smart data into my [Home Assistant](https://www.home-assistant.io/) setup ever since the energy dashboard became available. Since the meter reports the kW consumed every 30 mins, you'd think an API would be obvious for the end-users, but apparently not.
+
+Thanks to work by [badger707](https://github.com/badger707/esb-smart-meter-reading-automation) and [others](#references) we have a fairly good screen-scraping solution, so this fork is just to clean it up a bit, and document the integration to Home Assistant.
+
+NOTES:
+* You need to create account with ESB here https://myaccount.esbnetworks.ie 
 * In your account, link your electricity meter MPRN
-<br><br>
-# Script setup<br>
-* In script - update MPRN, user and password at the bottom of the code
 
-<br><br>
-I hope this will be usefull, cheers!
-<br><br>
+# Notes on the source data
+* The call to the ESB portal allows the period to be specified, and the script provides today as the date requested. Unfortunately, this parameter is ignored, so we get *all* the records available e.g. 20k+ and counting.
+* The data is provided every 30 mins in kW units. Home assistant requries this in *kWh* so in the sensor definition I multiple the value by 0.5 to adjust.
+* The timestamp in the source data is in Irish Standard Time, so I convert to UNIX EPOCH before inserting into the database.
+
+# Script usage
+
+The script will run on demand, or via cron. The required parameters should be in a `.secrets` file, in the same directory as the script. This is written in python3, and the `requirements.txt` file shows the dependancies.
+
+It works off of *all the data retrieved, so will become less efficient as time goes on. If there is a matching timestamp already in the database, it will be updated with the new value, otherwise any missing data will be inserted.
+
+The following are the required parameters for the config file.
+## Config file format
+
+```ini
+[influx]
+HOST=<influx db server hostname/IP> 
+USER=<username>
+PASSWORD=<password>
+DB=<name of database>
+
+[esb]
+USER=<email address registered with ESB Networks>
+PASSWORD=<password>
+MPRN=<MPRN - meter reference number, on your bill>
 ```
 
-# #!/usr/bin/env python3
+# Home Assistant Sensor Configuration
 
-# https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script
-# https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded
+This is in my `sensors.yaml`
+```yaml
 
-# Modified by badger707
-# it works as of 21-JUL-2023
-
-import requests
-from bs4 import BeautifulSoup
-import re
-import json
-import csv
-from datetime import datetime, timedelta, timezone
-
-def load_esb_data(user, password, mpnr, start_date):
-  print("[+] open session ...")
-  s = requests.Session()
-  s.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36',
-  })    
-  print("[+] calling login page. ..")
-  login_page = s.get('https://myaccount.esbnetworks.ie/', allow_redirects=True)
-  result = re.findall(r"(?<=var SETTINGS = )\S*;", str(login_page.content))
-  settings = json.loads(result[0][:-1])
-  print("[+] sending credentials ...")
-  s.post(
-    'https://login.esbnetworks.ie/esbntwkscustportalprdb2c01.onmicrosoft.com/B2C_1A_signup_signin/SelfAsserted?tx=' + settings['transId'] + '&p=B2C_1A_signup_signin', 
-    data={
-      'signInName': user, 
-      'password': password, 
-      'request_type': 'RESPONSE'
-    },
-    headers={
-      'x-csrf-token': settings['csrf'],
-    },
-    allow_redirects=False)
-  print("[+] passing AUTH ...")
-  confirm_login = s.get(
-    'https://login.esbnetworks.ie/esbntwkscustportalprdb2c01.onmicrosoft.com/B2C_1A_signup_signin/api/CombinedSigninAndSignup/confirmed',
-    params={
-      'rememberMe': False,
-      'csrf_token': settings['csrf'],
-      'tx': settings['transId'],
-      'p': 'B2C_1A_signup_signin',
-    }
-  )
-  print("[+] confirm_login: ",confirm_login)
-  print("[+] doing some BeautifulSoup ...")
-  soup = BeautifulSoup(confirm_login.content, 'html.parser')
-  form = soup.find('form', {'id': 'auto'})
-  s.post(
-    form['action'],
-    allow_redirects=False,
-    data={
-      'state': form.find('input', {'name': 'state'})['value'],
-      'client_info': form.find('input', {'name': 'client_info'})['value'],
-      'code': form.find('input', {'name': 'code'})['value'],
-    }, 
-  )
-  
-  #data = s.get('https://myaccount.esbnetworks.ie/datadub/GetHdfContent?mprn=' + mpnr + '&startDate=' + start_date.strftime('%Y-%m-%d'))
-  print("[+] getting CSV file for MPRN ...")
-  data = s.get('https://myaccount.esbnetworks.ie/DataHub/DownloadHdf?mprn=' + mpnr + '&startDate=' + start_date.strftime('%Y-%m-%d'))
-
-  print("[+] CSV file received !!!")
-  data_decoded = data.content.decode('utf-8').splitlines()
-  print("[+] data decoded from Binary format")
-  json_data = csv_response_to_json(data_decoded)
-  return json_data
-
-def csv_response_to_json(csv_file):
-  print("[+] creating JSON file from CSV ...")
-  my_json = []
-  csv_reader = csv.DictReader(csv_file)
-  for row in csv_reader:
-    my_json.append(row)
-  with open("json_data.json","w",encoding="utf-8") as jsonf:
-     json_out = json.dumps(my_json, indent=2)
-     jsonf.write(json_out)
-  print("[+] end of JSON OUT.",json_out)
-  print("[+] end of JSON OUT, returning value ...")
-  return json_out
-
-def parse_date(date_str):
-  print("[+] parsing some data fields ...")
-  if len(date_str) == 19:
-      return datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S')
-  else:
-      dt = datetime.strptime(date_str[:19], '%Y-%m-%dT%H:%M:%S')
-      tz_offset = int(date_str[-6:-3])
-      tz = timezone(timedelta(hours=tz_offset))
-      return dt.replace(tzinfo=tz)
-
-def load_smart_meter_stats_v2(user, password, mpnr):
-  #last_month = datetime.today() - timedelta(days=30)
-  today_ = datetime.today()
-  #smart_meter_data = load_esb_data(user, password, mpnr, last_month)
-  smart_meter_data = load_esb_data(user, password, mpnr, today_)
-  print("[+] smart_meter_data: ",smart_meter_data)
-  print("[++] end of smart_meter_data")
-  return smart_meter_data
-
-meter_mprn = "your-meter-mprn-number"
-esb_user_name = "your-esb-account@email.com"
-esb_password = "your-esb-account-password"
-
-xoxo = load_smart_meter_stats_v2(esb_user_name, esb_password, meter_mprn)
-print("[XOXO]: ",xoxo)
-print("[END] XOXO")
+  - platform: influxdb
+    api_version: 1
+    host: <host>
+    username: <username>
+    password: <password>
+    database: <database>
+    verify_ssl: false
+    ssl: false
+    queries:
+      - name: ESB Power
+        unit_of_measurement: kWh
+        device_class: energy
+        state_class: total
+        value_template: "{{ value | multiply(0.5) }}"
+        group_function: last
+        measurement: '"meter_reading"'
+        field: value
+        where: '"MPRN" = ''<MPRN>'''
 ```
+but we also need to adjust `customize.yaml` to ensure that we set the type correctly
+```yaml
+---
+customize:
+  sensor.esb_power:
+    device_class: energy
+    state_class: total
 
+```
+# Change Notes
+* Tested 03/01/2024 - working
 
+# References
+* [https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script](https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script)
+* [https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded](https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded)
+* [https://github.com/badger707/esb-smart-meter-reading-automation](https://github.com/badger707/esb-smart-meter-reading-automation)
