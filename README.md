@@ -1,12 +1,27 @@
 # ESB Networks Smart Meter Data to InfluxDB
+![](https://github.com/badger707/esb-smart-meter-reading-automation/blob/main/esb-smart-meter.png)
 
+I've wanted to get the ESB smart data into my [Home Assistant]() setup ever since the energy dashboard became available. Since the meter reports the kW consumed every 30 mins, you'd think an API would be obvious for the end-users, but apparently not.
 
+Thanks to work by [badger707](https://github.com/badger707/esb-smart-meter-reading-automation) and [others](#references) we have a fairly good screen-scraping solution, so this fork is just to clean it up a bit, and document the integration to Home Assistant.
 
+NOTES:
+* You need to create account with ESB here https://myaccount.esbnetworks.ie 
+* In your account, link your electricity meter MPRN
 
+# Notes on the source data
+* The call to the ESB portal allows the period to be specified, and the script provides today as the date requested. Unfortunately, this parameter is ignored, so we get *all* the records available e.g. 20k+ and counting.
+* The data is provided every 30 mins in kW units. Home assistant requries this in *kWh* so in the sensor definition I multiple the value by 0.5 to adjust.
+* The timestamp in the source data is in Irish Standard Time, so I convert to UNIX EPOCH before inserting into the database.
 
-# Config file format
+# Script usage
 
-```
+The script will run on demand, or via cron. The required parameters should be in a `.secrets` file, in the same directory as the script. This is written in python3, and the `requirements.txt` file shows the dependancies.
+
+The following are the required parameters for the config file.
+## Config file format
+
+```ini
 [influx]
 HOST=<influx db server hostname/IP> 
 USER=<username>
@@ -34,42 +49,16 @@ MPRN=<MPRN - meter reference number, on your bill>
     queries:
       - name: ESB Power
         unit_of_measurement: kWh
+        device_class: energy
+        state_class: total
         value_template: "{{ value | multiply(0.5) }}"
         group_function: last
         measurement: '"meter_reading"'
         field: value
         where: '"MPRN" = ''<MPRN>'''
-
-
 ```
-
-
-
-![](https://github.com/badger707/esb-smart-meter-reading-automation/blob/main/esb-smart-meter.png)
-<br><br>
-# How to read your Smart Meter data automatically?
-<br>
-Since I've got smart meter installed, I was looking for a way to automatically collect my meter data to track electricity usage (and solar export) with corresponding pricing as per current supplier rates.<br><br>
-While searching on internet I found this post https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script as potential candidate to start with.
-<br>
-Unfortunatelly linked script is broken - ESB have chnaged some URL's and file structure since then and I had to spend some time and tinker with code to make it working with new (as of writing it is 21-JUL-2023) URL structure.<br><br>
-End result - code is fixed and runs just fine now, I am able to read all smart meter readings from my account in JSON format and push it further to my InfluxDB and Home Assistant for analysis/reporting.
-<br><br>
-# Requirements<br>
-* You need to create account with ESB here https://myaccount.esbnetworks.ie <br>
-* In your account, link your electricity meter MPRN
-<br><br>
-# Script setup<br>
-* In script - update MPRN, user and password at the bottom of the code
-
-<br><br>
-I hope this will be usefull, cheers!
-<br><br>
-```
-
-
 
 # References
-* [](https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script)
-* [](https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded)
-* [](https://github.com/badger707/esb-smart-meter-reading-automation)
+* [https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script](https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script)
+* [https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded](https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded)
+* [https://github.com/badger707/esb-smart-meter-reading-automation](https://github.com/badger707/esb-smart-meter-reading-automation)
