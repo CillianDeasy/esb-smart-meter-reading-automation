@@ -73,6 +73,11 @@ customize:
 ## Change Notes
 * Tested 03/01/2024 - working
 
+## Tested with
+* Python 3.10.6
+* Home Assistant 2023.12.4
+* InfluxDB 1.8.10
+
 ## References
 * [https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script](https://www.boards.ie/discussion/2058292506/esb-smart-meter-data-script)
 * [https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded](https://gist.github.com/schlan/f72d823dd5c1c1d19dfd784eb392dded)
