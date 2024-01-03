@@ -1,7 +1,7 @@
 # ESB Networks Smart Meter Data to InfluxDB
 ![](https://github.com/badger707/esb-smart-meter-reading-automation/blob/main/esb-smart-meter.png)
 
-I've wanted to get the ESB smart data into my [Home Assistant]() setup ever since the energy dashboard became available. Since the meter reports the kW consumed every 30 mins, you'd think an API would be obvious for the end-users, but apparently not.
+I've wanted to get the ESB smart data into my [Home Assistant](https://www.home-assistant.io/) setup ever since the energy dashboard became available. Since the meter reports the kW consumed every 30 mins, you'd think an API would be obvious for the end-users, but apparently not.
 
 Thanks to work by [badger707](https://github.com/badger707/esb-smart-meter-reading-automation) and [others](#references) we have a fairly good screen-scraping solution, so this fork is just to clean it up a bit, and document the integration to Home Assistant.
 
