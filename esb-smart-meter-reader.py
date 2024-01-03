@@ -103,15 +103,19 @@ class EsbDataCollection:
       
     data_decoded = data.content.decode('utf-8').splitlines()
     logger.info('%s records retrieved and decoded.' % len(data_decoded))
+    logger.info('Newest data in record is: %s' % data_decoded[1].split(',')[4])
+    logger.info('Oldest data in record is: %s' % data_decoded[-1].split(',')[4])
+    
     return data_decoded
 
 
   def get_csv_data(self):
+    
     today = datetime.datetime.today()
     
     if self.csv is None:
       self.csv = self.__load_esb_data(today)
-    
+        
     return self.csv
   
   def get_json_data(self):
